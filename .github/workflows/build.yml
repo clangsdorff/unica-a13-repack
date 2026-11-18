@@ -1,0 +1,62 @@
+name: Repack
+
+on:
+  workflow_dispatch:
+    inputs:
+      drive_id:
+        description: Google Drive file ID for UN1CA zip
+        required: true
+        default: 1qGDakAmHBGmY9I_OmHQtbG5BpLJZh1P8
+      kernel_tag:
+        description: langsdorffkernel-a13 release tag (empty for latest)
+        required: false
+        default: ""
+      kernel_variant:
+        description: kernel variant (e, en, p, pn)
+        required: true
+        default: e
+
+jobs:
+  repack:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/.ghcup /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          sudo docker image prune -af > /dev/null
+          df -h / /mnt
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y brotli lz4 unzip autoconf automake libtool pkg-config liblz4-dev uuid-dev
+          curl -sSfL https://github.com/erofs/erofs-utils/archive/refs/tags/v1.9.4.tar.gz \
+            | tar -xz -C "$RUNNER_TEMP"
+          (cd "$RUNNER_TEMP/erofs-utils-1.9.4" && ./autogen.sh && ./configure && make -j"$(nproc)" && sudo make install)
+          fsck.erofs -V
+
+      - name: Repack
+        id: repack
+        env:
+          DRIVE_ID: ${{ inputs.drive_id }}
+          KERNEL_TAG: ${{ inputs.kernel_tag }}
+          KERNEL_VARIANT: ${{ inputs.kernel_variant }}
+          GH_TOKEN: ${{ github.token }}
+          WORK: /mnt/work
+        run: sudo -E env "PATH=$PATH" bash ci/build.sh
+
+      - name: Upload to gofile
+        env:
+          GOFILE_TOKEN: ${{ secrets.GOFILE_TOKEN }}
+          ZIP: ${{ steps.repack.outputs.zip }}
+        run: |
+          auth=()
+          [ -n "$GOFILE_TOKEN" ] && auth=(-H "Authorization: Bearer $GOFILE_TOKEN")
+          res="$(curl -sf "${auth[@]}" -F "file=@$ZIP" https://upload.gofile.io/uploadfile)"
+          link="$(jq -r '.data.downloadPage' <<< "$res")"
+          [ "$(jq -r .status <<< "$res")" = ok ] || { echo "$res"; exit 1; }
+          echo "$(basename "$ZIP"): $link" | tee -a "$GITHUB_STEP_SUMMARY"
