@@ -33,7 +33,7 @@ gh release download "$KERNEL_TAG" -R clangsdorff/langsdorffkernel-a13 \
     -p "2-langsdorff@a13-${KERNEL_TAG}_odm.img" -O "$W/odm.img"
 
 gh release download "$KERNEL_TAG" -R clangsdorff/langsdorffkernel-a13 \
-    -p "3-langsdorff@a13-${KERNEL_TAG}${KERNEL_VARIANT}.tar" -O "$W/kernel.tar"
+    -p "*langsdorff@a13-${KERNEL_TAG}${KERNEL_VARIANT}.tar" -O "$W/kernel.tar"
 for f in boot dtbo; do
     tar -xOf "$W/kernel.tar" "$f.img.lz4" | lz4 -d > "$W/zip/$f.img"
 done
