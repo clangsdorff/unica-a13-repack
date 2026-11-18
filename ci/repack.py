@@ -72,17 +72,18 @@ def img2sdat(img_path, out_dir, part):
 
 
 def patch_meta(zip_dir, sizes):
-    """Remove vendor_boot from updater-script and update dynamic_partitions_op_list."""
-    vb = os.path.join(zip_dir, "vendor_boot.img")
-    if os.path.exists(vb):
-        os.remove(vb)
+    """Remove vendor_boot/init_boot from updater-script and update dynamic_partitions_op_list."""
+    for img in ("vendor_boot.img", "init_boot.img"):
+        p = os.path.join(zip_dir, img)
+        if os.path.exists(p):
+            os.remove(p)
 
     script_path = os.path.join(zip_dir, "META-INF/com/google/android/updater-script")
     with open(script_path, "r", encoding="utf-8") as f:
         lines = f.readlines()
-    filtered = [line for line in lines if "vendor_boot" not in line]
+    filtered = [line for line in lines if "vendor_boot" not in line and "init_boot" not in line]
     if len(filtered) == len(lines):
-        raise RuntimeError("vendor_boot lines not found in updater-script")
+        raise RuntimeError("vendor_boot/init_boot lines not found in updater-script")
     with open(script_path, "w", encoding="utf-8") as f:
         f.writelines(filtered)
 
